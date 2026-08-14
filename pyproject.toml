@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ingestion"
+version = "0.1.0"
+description = "Phase 1 (free, local) ingestion scan for the investment-analysis RAG pipeline"
+requires-python = ">=3.12"
+dependencies = [
+    "pdfplumber>=0.11",
+    "transformers>=4.46",
+    "langchain-text-splitters>=0.3",
+    "tiktoken>=0.8",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "reportlab>=4.0",
+]
+
+[project.scripts]
+ingest-phase1 = "ingestion.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ingestion"]
