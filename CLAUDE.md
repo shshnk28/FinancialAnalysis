@@ -128,14 +128,29 @@ no real spend occurs against them. See §6 for re-enabling this.
 - Loaded from environment variables (`OPENAI_API_KEY`), via `python-dotenv`.
 - Never hardcoded. Never committed. `.env` is gitignored.
 
-### 3e. Vector DB (Phase 2 — deferred)
+### 3e. Vector DB (Phase 2 — DECIDED: Qdrant, embedded/in-process)
 
-- Choice undecided; taken after Phase 1 completes.
-- Abstract behind an interface, e.g.:
+- **Decision (frozen):** **Qdrant**, run **embedded / in-process** via
+  `QdrantClient(path=...)` — on-disk local persistence, **no server, no Docker**.
+  Rationale: local-first fit (nothing to operate), and an **identical client API
+  across embedded → local server → Qdrant Cloud**, so scaling up is a one-line
+  constructor change, never a rewrite — the §2 "build the abstraction now, swap
+  later" principle.
+- **Retrieval mode (frozen for now):** **DENSE ONLY.** Sparse vectors / hybrid
+  (dense+sparse) fusion is a **deferred improvement** (§6), not built day one.
+- **Collection config** (derived from §3a, not a new decision): **768-dim** vectors
+  (all-mpnet-base-v2), **cosine** distance. The point payload carries the original
+  content + metadata for filtering (company, `report_id`, page, section).
+- **Forward-compat for hybrid:** when Phase 2 is built, create the collection with
+  **named vectors** so a sparse vector can be added later without a destructive
+  migration. Do NOT add sparse now.
+- Abstract behind an interface (unchanged):
   ```
   VectorStore.index(records: list[VectorRecord]) -> None
   ```
-  where a `VectorRecord` carries the vector + original content + metadata.
+  where a `VectorRecord` carries the vector + original content + metadata. A
+  concrete `QdrantVectorStore(VectorStore)` is Phase 2 work — `VectorRecord`
+  maps to a Qdrant point `(id, vector, payload)`.
 - No implementation in Phase 1.
 
 ---
@@ -196,7 +211,8 @@ Rules:
 
 - Whether/when to lift the LLM table-summarization hold (§3c) — until then,
   tables are logged-and-skipped rather than summarized/embedded.
-- Vector DB choice (§3e) — after Phase 1.
+- Enabling hybrid retrieval — add sparse vectors to the Qdrant collection (§3e);
+  a deferred improvement, dense-only ships first.
 - Additional `EmbedderProfile`s for recall@k comparison — after Phase 1 works.
 - Section-header-aware pre-splitting (so chunks don't straddle report sections) —
   a refinement, not day-one.
