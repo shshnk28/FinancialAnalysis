@@ -24,7 +24,11 @@ The pipeline runs in two phases separated by a **cost-consent gate**.
   no network spend. Extracts content, detects tables and images, counts tokens,
   and emits a cost summary for user consent.
 - **Phase 2 — Process.** Paid. Runs ONLY after the user approves the Phase 1
-  summary. Summarizes tables via LLM, embeds, indexes.
+  summary. Embeds `prose_chunks` and indexes them via `VectorStore`.
+  **LLM table-summarization is currently on hold** (see §3c) — tables are
+  logged-and-skipped instead, the same disposition as images and dense
+  vector-graphic regions. No table content is embedded or indexed while this
+  hold is in effect.
 
 **We are implementing PHASE 1 ONLY right now.** Do not write Phase 2 logic yet.
 Design Phase 1 so Phase 2 slots in against the contract in §5.
@@ -40,9 +44,13 @@ cost report.
 
 - **No silent data loss.** Every element gets an explicit disposition: parsed,
   summarized, or logged-and-skipped. Nothing is dropped without a record.
+  **Tables currently get the logged-and-skipped disposition**, not summarized
+  — LLM table-summarization is on hold (§3c).
 - **LLM is never the source of truth for numbers.** Precise financial ratios
-  come from a structured API elsewhere (not this repo). The LLM only turns table
-  grids into prose for retrieval, in Phase 2.
+  come from a structured API elsewhere (not this repo). When/if LLM
+  table-summarization is resumed (currently on hold, §3c), the LLM only turns
+  table grids into prose for retrieval — it never computes or asserts numeric
+  values itself.
 - **Cost is visible and consented before it is incurred.** The gate is the point.
 - **Swappable components are abstracted behind interfaces** (embedder, LLM,
   vector DB). Choices are deferred and measured, not guessed.
@@ -89,9 +97,18 @@ Rules:
 - Chunk size and overlap come from the active `EmbedderProfile` (§3a), never
   hardcoded elsewhere.
 
-### 3c. LLM (Phase 2 — interface only in Phase 1)
+### 3c. LLM (Phase 2 — interface only in Phase 1; **currently on hold**)
 
-- Provider: **OpenAI** (decided). Tokenizer for cost estimation: **tiktoken**.
+**STATUS: on hold.** Phase 2 does not call the LLM to summarize tables right
+now — tables are logged-and-skipped instead (§2), same disposition as images
+and dense vector-graphic regions. This is a reversible policy decision, not a
+scope removal: the interface, config, and Phase 1 token-counting/cost-estimate
+machinery described below stay in the codebase unchanged and are simply not
+invoked for table summarization at present. Phase 1's per-table token count and
+cost estimate are therefore informational only while the hold is in effect —
+no real spend occurs against them. See §6 for re-enabling this.
+
+- Provider: **OpenAI** (decided, if/when re-enabled). Tokenizer for cost estimation: **tiktoken**.
 - Expose a provider-agnostic interface:
   ```
   LLMClient.summarize(table_markdown: str) -> str
@@ -165,8 +182,11 @@ IngestionManifest:
 Rules:
 - Phase 1 populates this fully. It contains NO embeddings and NO table summaries
   — those are Phase 2 products.
-- Phase 2 consumes `tables` (to summarize), then `prose_chunks` + summaries
-  (to embed), then indexes via `VectorStore`.
+- Phase 2 consumes `prose_chunks` (embeds them directly) and indexes via
+  `VectorStore`. **`tables` are currently logged-and-skipped, not summarized or
+  embedded** — LLM table-summarization is on hold (§3c). The field stays
+  populated as retrievable metadata and as the seam Phase 2 will consume
+  (`tables`, to summarize) if that hold is lifted.
 - `chunk_id` scheme: `report_id:page:chunk_index` — stable, for retrieval-quality
   debugging later.
 
@@ -174,6 +194,8 @@ Rules:
 
 ## 6. DECISIONS STILL OPEN (do not implement)
 
+- Whether/when to lift the LLM table-summarization hold (§3c) — until then,
+  tables are logged-and-skipped rather than summarized/embedded.
 - Vector DB choice (§3e) — after Phase 1.
 - Additional `EmbedderProfile`s for recall@k comparison — after Phase 1 works.
 - Section-header-aware pre-splitting (so chunks don't straddle report sections) —
@@ -189,3 +211,6 @@ Rules:
 | `max_output_tokens` | 150 | LLMClient config | cap on each table summary's output; bounds cost |
 
 Different models, different directions. Never merge them.
+
+Note: LLM table-summarization is currently on hold (§3c), so `max_output_tokens`
+remains defined in code but isn't presently enforced against real spend.
