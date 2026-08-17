@@ -244,6 +244,8 @@ rewrite. Define it explicitly.
 ```
 IngestionManifest:
     document_name       : str
+    company             : str                  # user-provided identity (--company)
+    period              : str                  # user-provided reporting period (--period), e.g. "FY2026"
     page_count          : int
     prose_chunks        : list[Chunk]          # text + metadata (page, section, chunk_id)
     tables              : list[TableGrid]      # markdown grid + source page  (NOT yet summarized)
@@ -263,6 +265,14 @@ Rules:
   (`tables`, to summarize) if that hold is lifted.
 - `chunk_id` scheme: `report_id:page:chunk_index` — stable, for retrieval-quality
   debugging later.
+- **Document identity (`company`, `period`)** is document-level and **user-provided**
+  at ingestion via required `--company` / `--period` flags on `ingest-phase1` — no
+  filename parsing, no LLM extraction (both were considered and rejected as
+  fragile/out-of-boundary). It is surfaced in the consent summary for the user to
+  confirm. Phase 2 **denormalizes** these onto each Qdrant point's payload so
+  retrieval can filter by company/period; they are NOT stored per-`Chunk` in the
+  manifest. Schema is intentionally minimal (two strings) — a canonical
+  ticker/company-id key can be added later if joins to the structured API are needed.
 
 ---
 

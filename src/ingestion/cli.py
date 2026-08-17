@@ -15,6 +15,8 @@ from ingestion.token_counting import count_table_tokens, estimate_output_tokens
 def main() -> None:
     parser = argparse.ArgumentParser(description="Phase 1 ingestion scan (free, local only)")
     parser.add_argument("pdf_path", type=Path, help="Path to the annual-report PDF")
+    parser.add_argument("--company", required=True, help="Company this report belongs to (retrieval metadata)")
+    parser.add_argument("--period", required=True, help="Reporting period, e.g. FY2026 (retrieval metadata)")
     parser.add_argument("--report-id", default=None, help="Override auto-derived report_id")
     parser.add_argument("--json-out", type=Path, default=None, help="Optional path to dump manifest as JSON")
     args = parser.parse_args()
@@ -28,6 +30,8 @@ def main() -> None:
 
     manifest = build_manifest(
         document_name=extraction.document_name,
+        company=args.company,
+        period=args.period,
         page_count=extraction.page_count,
         prose_chunks=chunks,
         tables=extraction.tables,

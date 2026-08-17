@@ -40,6 +40,8 @@ def test_build_manifest_assembles_all_contract_fields():
 
     manifest = build_manifest(
         document_name="report.pdf",
+        company="Eternal Ltd",
+        period="FY2026",
         page_count=2,
         prose_chunks=chunks,
         tables=tables,
@@ -49,6 +51,8 @@ def test_build_manifest_assembles_all_contract_fields():
     )
 
     assert manifest.document_name == "report.pdf"
+    assert manifest.company == "Eternal Ltd"
+    assert manifest.period == "FY2026"
     assert manifest.page_count == 2
     assert manifest.prose_chunks == chunks
     assert manifest.tables == tables

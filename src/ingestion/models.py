@@ -42,6 +42,8 @@ class CostEstimate:
 @dataclass
 class IngestionManifest:
     document_name: str
+    company: str        # user-provided document identity (for per-company retrieval filtering)
+    period: str         # user-provided reporting period, e.g. "FY2026"
     page_count: int
     prose_chunks: list[Chunk] = field(default_factory=list)
     tables: list[TableGrid] = field(default_factory=list)

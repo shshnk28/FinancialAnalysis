@@ -27,6 +27,8 @@ def estimate_cost(table_tokens: list[int], est_output_tokens: int) -> CostEstima
 
 def build_manifest(
     document_name: str,
+    company: str,
+    period: str,
     page_count: int,
     prose_chunks: list[Chunk],
     tables: list[TableGrid],
@@ -36,6 +38,8 @@ def build_manifest(
 ) -> IngestionManifest:
     return IngestionManifest(
         document_name=document_name,
+        company=company,
+        period=period,
         page_count=page_count,
         prose_chunks=prose_chunks,
         tables=tables,
@@ -53,6 +57,8 @@ def print_consent_summary(manifest: IngestionManifest) -> None:
     print("PHASE 1 SCAN COMPLETE — COST-CONSENT SUMMARY")
     print("=" * 60)
     print(f"Document: {manifest.document_name}")
+    print(f"Company: {manifest.company}")
+    print(f"Period: {manifest.period}")
     print(f"Pages: {manifest.page_count}")
     print(f"Prose chunks: {len(manifest.prose_chunks)}")
     print(f"Tables (real content): {len(manifest.tables)}")
