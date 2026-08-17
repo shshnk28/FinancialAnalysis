@@ -35,8 +35,39 @@ Design Phase 1 so Phase 2 slots in against the contract in §5.
 
 **Self-check test:** before writing any code, ask "is this free and local?"
 If it calls an LLM, an embedding model, or any paid/network service, it is
-Phase 2 — stop. Phase 1's only outputs are a manifest object (§5) and a printed
-cost report.
+Phase 2 — stop. Phase 1's only outputs are a **persisted manifest** (§5, written
+to disk per §1a) and a printed cost report.
+
+### 1a. Gate mechanics — the two-command handoff (DECIDED)
+
+The cost-consent gate is realized as **two separate CLI commands**, with the
+`IngestionManifest` (§5) as the durable handoff artifact:
+
+1. **`ingest-phase1 <pdf>`** (built) runs the free/local scan and **persists the
+   full manifest** as JSON to a deterministic path **`./manifests/<report_id>.json`**,
+   printing that path alongside the cost summary. The manifest is self-contained —
+   it holds every chunk's text — so nothing else is needed downstream.
+2. **The user reviews** the printed cost summary.
+3. **`ingest-phase2 <manifest.json>`** (Phase 2 — not built yet) takes the manifest
+   path as an **explicit argument**, **re-prints the cost summary** from it, and
+   **requires interactive confirmation** (`[y/N]`, default No) before doing any
+   embed/index work. A **`--yes`** flag bypasses the prompt for automation/CI.
+
+Rules:
+- Phase 2 consumes **only** the manifest JSON — it never re-opens the PDF or
+  re-runs extraction. The manifest is the §5 seam, made durable.
+- The manifest filename is derived from `report_id` (the content hash, §5) so it is
+  unique per document and predictable; `./manifests/` is the default directory.
+- **Consent = the deliberate second invocation + the confirmation.** Running
+  `ingest-phase2` on a reviewed manifest is the act of approval.
+- **Currently free:** with the LLM hold in effect (§3c), Phase 2 is embed+index —
+  both local and free — so the gate presently guards compute/time, not dollars. The
+  gate stays regardless: it is the architectural invariant, and regains dollar-stakes
+  if the hold lifts.
+- **Implied Phase 1 change (deferred, NOT Phase 2 logic):** `ingest-phase1` today
+  persists the manifest only via an optional `--json-out`; it must be updated to write
+  `./manifests/<report_id>.json` by default. Do this when Phase 2 is built, or as a
+  small Phase 1 touch-up — it is not yet done.
 
 ---
 
