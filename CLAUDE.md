@@ -153,6 +153,34 @@ no real spend occurs against them. See §6 for re-enabling this.
   maps to a Qdrant point `(id, vector, payload)`.
 - No implementation in Phase 1.
 
+### 3f. Embedding execution (Phase 2 — DECIDED: sentence-transformers, local, CPU)
+
+- **Decision (frozen):** run the `EmbedderProfile.model_id` model via the
+  **`sentence-transformers`** library, **locally, on CPU**. This is the canonical,
+  reference-correct way to run all-mpnet-base-v2. It adds **`torch`** as a Phase 2
+  dependency — Phase 1 deliberately avoided torch (fast tokenizer only); this is
+  the point where it legitimately enters.
+- **Concrete implementation (Phase 2, not written yet):** a
+  `SentenceTransformerEmbedder(Embedder)` that loads `profile.model_id` and
+  implements `embed(texts) -> list[list[float]]`. All model/sizing config comes
+  from the active `EmbedderProfile` (§3a) — never hardcoded here.
+- **Encode settings (frozen):**
+  - `normalize_embeddings=True` — unit-length vectors. Redundant under the frozen
+    cosine distance (§3e) but harmless, and leaves the door open to switch to
+    faster dot-product later without re-embedding.
+  - `batch_size = 32` — number of chunks embedded per forward pass (NOT tokens,
+    NOT vector dims); sensible CPU default, tunable and not load-bearing — it has
+    no effect on the resulting vectors, only throughput/memory.
+  - **No query/passage prefixes** — mpnet does not use them (unlike e5/bge);
+    embed chunk text as-is.
+- **Input:** `prose_chunks[*].text` only. Tables are NOT embedded while the LLM
+  table-summarization hold (§3c) is in effect — they are logged-and-skipped.
+- **Free but still Phase 2:** local CPU embedding incurs no API spend, but §1
+  places embedding in Phase 2 regardless — it runs only after the cost-consent
+  gate, never in the Phase 1 scan.
+- **Model asset:** all-mpnet-base-v2 (~420MB) downloads once from the HF Hub to the
+  local cache (the same one-time free download as the tokenizer), then runs offline.
+
 ---
 
 ## 4. PHASE 1 — build order (verify each step before the next)
@@ -213,6 +241,9 @@ Rules:
   tables are logged-and-skipped rather than summarized/embedded.
 - Enabling hybrid retrieval — add sparse vectors to the Qdrant collection (§3e);
   a deferred improvement, dense-only ships first.
+- Torch-free embedding via ONNX (optimum / Qdrant fastembed) (§3f) — a deferred
+  optimization; sentence-transformers ships first. Needs verification that
+  all-mpnet-base-v2 is supported without a manual ONNX export.
 - Additional `EmbedderProfile`s for recall@k comparison — after Phase 1 works.
 - Section-header-aware pre-splitting (so chunks don't straddle report sections) —
   a refinement, not day-one.
