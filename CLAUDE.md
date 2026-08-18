@@ -64,10 +64,10 @@ Rules:
   both local and free — so the gate presently guards compute/time, not dollars. The
   gate stays regardless: it is the architectural invariant, and regains dollar-stakes
   if the hold lifts.
-- **Implied Phase 1 change (deferred, NOT Phase 2 logic):** `ingest-phase1` today
-  persists the manifest only via an optional `--json-out`; it must be updated to write
-  `./manifests/<report_id>.json` by default. Do this when Phase 2 is built, or as a
-  small Phase 1 touch-up — it is not yet done.
+- **Manifest persistence (DONE):** `ingest-phase1` writes the full manifest to
+  `./manifests/<report_id>.json` by **default** (creating the dir as needed) and prints
+  that path plus the exact `ingest-phase2 <path>` command to run next. `--json-out`
+  overrides the location. The `manifests/` dir is gitignored (generated artifact).
 
 ---
 

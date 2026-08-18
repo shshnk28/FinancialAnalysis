@@ -18,7 +18,12 @@ def main() -> None:
     parser.add_argument("--company", required=True, help="Company this report belongs to (retrieval metadata)")
     parser.add_argument("--period", required=True, help="Reporting period, e.g. FY2026 (retrieval metadata)")
     parser.add_argument("--report-id", default=None, help="Override auto-derived report_id")
-    parser.add_argument("--json-out", type=Path, default=None, help="Optional path to dump manifest as JSON")
+    parser.add_argument(
+        "--json-out",
+        type=Path,
+        default=None,
+        help="Override the default manifest path (default: ./manifests/<report_id>.json)",
+    )
     args = parser.parse_args()
 
     report_id = args.report_id or compute_report_id(args.pdf_path)
@@ -42,9 +47,13 @@ def main() -> None:
 
     print_consent_summary(manifest)
 
-    if args.json_out:
-        args.json_out.write_text(json.dumps(asdict(manifest), indent=2))
-        print(f"Manifest written to {args.json_out}")
+    # Phase 1 always persists the manifest — it is the durable handoff to Phase 2 (§1a).
+    # Default location is deterministic (./manifests/<report_id>.json); --json-out overrides.
+    out_path = args.json_out or Path("manifests") / f"{report_id}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(asdict(manifest), indent=2))
+    print(f"Manifest written to {out_path}")
+    print(f"Next (Phase 2, once built): review the summary above, then  ingest-phase2 {out_path}")
 
 
 if __name__ == "__main__":

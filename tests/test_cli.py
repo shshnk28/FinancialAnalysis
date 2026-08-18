@@ -8,7 +8,8 @@ from ingestion.cli import main
 _IDENTITY = ["--company", "Eternal Ltd", "--period", "FY2026"]
 
 
-def test_cli_runs_end_to_end_and_prints_consent_summary(synthetic_pdf, capsys, monkeypatch):
+def test_cli_runs_end_to_end_and_prints_consent_summary(synthetic_pdf, tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # isolate default ./manifests/ output from the repo
     monkeypatch.setattr(sys, "argv", ["ingest-phase1", str(synthetic_pdf), *_IDENTITY])
     main()
 
@@ -61,3 +62,23 @@ def test_cli_requires_company_and_period(synthetic_pdf, monkeypatch):
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code != 0
+
+
+def test_cli_persists_manifest_to_default_path(synthetic_pdf, tmp_path, capsys, monkeypatch):
+    # With no --json-out, Phase 1 must persist to ./manifests/<report_id>.json by default (§1a).
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys, "argv", ["ingest-phase1", str(synthetic_pdf), *_IDENTITY, "--report-id", "abc123"]
+    )
+    main()
+
+    default_path = tmp_path / "manifests" / "abc123.json"
+    assert default_path.exists()
+    data = json.loads(default_path.read_text())
+    assert data["company"] == "Eternal Ltd"
+    assert data["period"] == "FY2026"
+
+    # The printed output points the user at the exact manifest path for Phase 2.
+    printed = capsys.readouterr().out
+    assert "manifests/abc123.json" in printed  # relative path, as printed
+    assert "ingest-phase2" in printed

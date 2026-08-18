@@ -8,4 +8,5 @@ dist/
 .pytest_cache/
 .idea/
 *.pdf
+manifests/
 .claude/settings.local.json
