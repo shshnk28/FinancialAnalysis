@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "ingestion"
 version = "0.1.0"
-description = "Phase 1 (free, local) ingestion scan for the investment-analysis RAG pipeline"
+description = "Ingestion pipeline (Phase 1 scan + Phase 2 embed/index) for the investment-analysis RAG tool"
 requires-python = ">=3.12"
 dependencies = [
     "pdfplumber>=0.11",
@@ -13,6 +13,9 @@ dependencies = [
     "langchain-text-splitters>=0.3",
     "tiktoken>=0.8",
     "python-dotenv>=1.0",
+    # Phase 2
+    "sentence-transformers>=3.0",   # embedder (§3f); pulls torch (CPU)
+    "qdrant-client>=1.7",           # vector store (§3e); embedded/in-process mode
 ]
 
 [project.optional-dependencies]
@@ -23,6 +26,7 @@ dev = [
 
 [project.scripts]
 ingest-phase1 = "ingestion.cli:main"
+ingest-phase2 = "ingestion.cli_phase2:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ingestion"]

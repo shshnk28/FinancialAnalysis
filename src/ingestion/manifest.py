@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from ingestion.config.pricing import CHEAP_TIER, EXPENSIVE_TIER
 from ingestion.models import Chunk, CostEstimate, IngestionManifest, SkippedVisual, TableGrid
 
@@ -47,6 +50,28 @@ def build_manifest(
         table_input_tokens=table_input_tokens,
         est_output_tokens=est_output_tokens,
         cost_estimate=estimate_cost(table_input_tokens, est_output_tokens),
+    )
+
+
+def load_manifest(path: Path) -> IngestionManifest:
+    """Reconstruct an IngestionManifest from the JSON Phase 1 wrote (asdict shape).
+
+    This is the Phase 2 entry point for the §1a two-command handoff: Phase 2
+    consumes ONLY this file — it never re-opens the PDF.
+    """
+    data = json.loads(Path(path).read_text())
+    ce = data.get("cost_estimate")
+    return IngestionManifest(
+        document_name=data["document_name"],
+        company=data["company"],
+        period=data["period"],
+        page_count=data["page_count"],
+        prose_chunks=[Chunk(**c) for c in data["prose_chunks"]],
+        tables=[TableGrid(**t) for t in data["tables"]],
+        skipped_visuals=[SkippedVisual(**v) for v in data["skipped_visuals"]],
+        table_input_tokens=list(data["table_input_tokens"]),
+        est_output_tokens=data["est_output_tokens"],
+        cost_estimate=CostEstimate(**ce) if ce is not None else None,
     )
 
 

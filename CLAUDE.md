@@ -30,13 +30,17 @@ The pipeline runs in two phases separated by a **cost-consent gate**.
   vector-graphic regions. No table content is embedded or indexed while this
   hold is in effect.
 
-**We are implementing PHASE 1 ONLY right now.** Do not write Phase 2 logic yet.
-Design Phase 1 so Phase 2 slots in against the contract in §5.
+**Phase 1 is complete. We are now implementing PHASE 2** against the frozen
+contract (§5) and decisions (§3, §1a). The phase boundary still holds: Phase 2
+runs ONLY behind the consent gate (§1a), and every piece of code must respect
+which phase it belongs to.
 
-**Self-check test:** before writing any code, ask "is this free and local?"
-If it calls an LLM, an embedding model, or any paid/network service, it is
-Phase 2 — stop. Phase 1's only outputs are a **persisted manifest** (§5, written
-to disk per §1a) and a printed cost report.
+**Self-check test:** which phase does this code belong to? Extraction, chunking,
+token-counting, and manifest assembly are **Phase 1** (free, local, no embedding).
+Embedding and vector indexing are **Phase 2**, and run only after the consent gate
+(§1a). Note embedding is **local and currently free** — the only *paid* Phase 2 step,
+LLM table-summarization, remains on hold (§3c), so nothing in Phase 2 spends money
+today; the gate still governs it as the architectural invariant.
 
 ### 1a. Gate mechanics — the two-command handoff (DECIDED)
 
@@ -48,10 +52,11 @@ The cost-consent gate is realized as **two separate CLI commands**, with the
    printing that path alongside the cost summary. The manifest is self-contained —
    it holds every chunk's text — so nothing else is needed downstream.
 2. **The user reviews** the printed cost summary.
-3. **`ingest-phase2 <manifest.json>`** (Phase 2 — not built yet) takes the manifest
-   path as an **explicit argument**, **re-prints the cost summary** from it, and
-   **requires interactive confirmation** (`[y/N]`, default No) before doing any
-   embed/index work. A **`--yes`** flag bypasses the prompt for automation/CI.
+3. **`ingest-phase2 <manifest.json>`** (implemented in `cli_phase2.py`) takes the
+   manifest path as an **explicit argument**, **re-prints the cost summary** from it,
+   and **requires interactive confirmation** (`[y/N]`, default No) before doing any
+   embed/index work. A **`--yes`** flag bypasses the prompt for automation/CI;
+   **`--replace`** authorizes overwriting a different document on a collision (§3e).
 
 Rules:
 - Phase 2 consumes **only** the manifest JSON — it never re-opens the PDF or
@@ -212,10 +217,10 @@ no real spend occurs against them. See §6 for re-enabling this.
   ```
   VectorStore.index(records: list[VectorRecord]) -> None
   ```
-  where a `VectorRecord` carries the vector + original content + metadata. A
-  concrete `QdrantVectorStore(VectorStore)` is Phase 2 work — `VectorRecord`
-  maps to a Qdrant point `(id, vector, payload)`.
-- No implementation in Phase 1.
+  where a `VectorRecord` carries the vector + original content + metadata. The
+  concrete `QdrantVectorStore(VectorStore)` is implemented in
+  `src/ingestion/vector_store_qdrant.py` — `VectorRecord` maps to a Qdrant point
+  `(uuid5 id, {"dense": vector}, payload)`.
 
 ### 3f. Embedding execution (Phase 2 — DECIDED: sentence-transformers, local, CPU)
 
@@ -224,10 +229,10 @@ no real spend occurs against them. See §6 for re-enabling this.
   reference-correct way to run all-mpnet-base-v2. It adds **`torch`** as a Phase 2
   dependency — Phase 1 deliberately avoided torch (fast tokenizer only); this is
   the point where it legitimately enters.
-- **Concrete implementation (Phase 2, not written yet):** a
-  `SentenceTransformerEmbedder(Embedder)` that loads `profile.model_id` and
-  implements `embed(texts) -> list[list[float]]`. All model/sizing config comes
-  from the active `EmbedderProfile` (§3a) — never hardcoded here.
+- **Concrete implementation:** `SentenceTransformerEmbedder(Embedder)` in
+  `src/ingestion/embedding.py` loads `profile.model_id` and implements
+  `embed(texts) -> list[list[float]]` (lazy CPU model load). All model/sizing config
+  comes from the active `EmbedderProfile` (§3a) — never hardcoded here.
 - **Encode settings (frozen):**
   - `normalize_embeddings=True` — unit-length vectors. Redundant under the frozen
     cosine distance (§3e) but harmless, and leaves the door open to switch to

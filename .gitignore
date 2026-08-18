@@ -9,4 +9,5 @@ dist/
 .idea/
 *.pdf
 manifests/
+qdrant_data/
 .claude/settings.local.json
