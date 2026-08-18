@@ -170,11 +170,44 @@ no real spend occurs against them. See §6 for re-enabling this.
 - **Retrieval mode (frozen for now):** **DENSE ONLY.** Sparse vectors / hybrid
   (dense+sparse) fusion is a **deferred improvement** (§6), not built day one.
 - **Collection config** (derived from §3a, not a new decision): **768-dim** vectors
-  (all-mpnet-base-v2), **cosine** distance. The point payload carries the original
-  content + metadata for filtering (company, `report_id`, page, section).
-- **Forward-compat for hybrid:** when Phase 2 is built, create the collection with
-  **named vectors** so a sparse vector can be added later without a destructive
-  migration. Do NOT add sparse now.
+  (all-mpnet-base-v2), **cosine** distance.
+- **Collection layout (DECIDED):** a **single collection** (default name
+  `annual_reports`) holds every company's vectors; retrieval scopes by company/period
+  via **payload filters**, not separate collections. Simplest, enables cross-company
+  comparison, and scales fine at our size. (Under embedded exact-search a per-company
+  collection would shrink each query's search space, but a `company` payload filter
+  largely neutralizes that.)
+- **Point ID scheme (DECIDED):** Qdrant IDs must be uint64 or UUID, so the string
+  `chunk_id` (`report_id:page:chunk_index`) cannot be the ID directly. Use a
+  **deterministic `uuid5(namespace, chunk_id)`** as the point ID — same chunk always
+  maps to the same point, giving idempotent upserts. The human-readable `chunk_id`
+  rides in the payload for traceability.
+- **Payload schema (DECIDED):** each point carries `chunk_id`, `text` (the chunk
+  content, so retrieval returns text directly), `page`, `section`, plus the
+  denormalized document identity `report_id`, `document_name`, `company`, `period`.
+  **Payload indexes** are created on **`company`, `period`, `report_id`** (the filter
+  keys).
+- **Re-ingestion & `(company, period)` uniqueness guard (DECIDED):** before indexing,
+  Phase 2 checks Qdrant for existing points at this `(company, period)` and branches:
+  - **None exist** → proceed (fresh index).
+  - **Exist with the same `report_id`** → identical content; idempotent refresh (the
+    deterministic UUIDv5 IDs overwrite in place); proceed quietly.
+  - **Exist with a _different_ `report_id`** → **collision**: a different document is
+    already indexed for this company+period. The system CANNOT distinguish a legitimate
+    corrected-report re-ingest from a mistaken wrong-file ingest — both look like "a new
+    `report_id` landing on an existing `(company, period)`" — so it must NOT act silently.
+    **Refuse by default:** interactively, show existing (`document_name`, `report_id`) vs
+    incoming and require an explicit `[y/N]` confirm (default **No**); non-interactively
+    (`--yes`), refuse unless **`--replace`** is ALSO passed. Only on explicit approval does
+    it **replace** — delete existing points keyed on `(company, period)` (NOT `report_id`,
+    which changes with content), then insert the new version. This upholds §2 (no silent
+    data loss): a mistaken re-index aborts with the prior document intact.
+  - **Caveat:** the guard is only as reliable as `(company, period)` strings being
+    consistent — free-text `period` spellings (`FY2026` vs `FY25-26`) would evade it.
+    Hardening via a canonical key / `period` normalization is deferred (§6).
+- **Forward-compat for hybrid:** create the collection with **named vectors** (the
+  dense vector named, e.g. `"dense"`) so a sparse vector can be added later without a
+  destructive migration. Do NOT add sparse now.
 - Abstract behind an interface (unchanged):
   ```
   VectorStore.index(records: list[VectorRecord]) -> None
@@ -285,6 +318,9 @@ Rules:
 - Torch-free embedding via ONNX (optimum / Qdrant fastembed) (§3f) — a deferred
   optimization; sentence-transformers ships first. Needs verification that
   all-mpnet-base-v2 is supported without a manual ONNX export.
+- Hardening the `(company, period)` uniqueness guard (§3e) — a canonical company/period
+  key and/or `period` normalization so differently-spelled periods can't evade the
+  collision check. Deferred; the free-text guard ships first.
 - Additional `EmbedderProfile`s for recall@k comparison — after Phase 1 works.
 - Section-header-aware pre-splitting (so chunks don't straddle report sections) —
   a refinement, not day-one.
