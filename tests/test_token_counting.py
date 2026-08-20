@@ -1,8 +1,8 @@
 import tiktoken
 
-from ingestion.config.llm_config import LLMConfig
-from ingestion.models import TableGrid
-from ingestion.token_counting import ENCODING_NAME, count_table_tokens, estimate_output_tokens
+from common.config.llm_config import LLMConfig
+from common.models import TableGrid
+from ingestion.extraction.token_counting import ENCODING_NAME, count_table_tokens, estimate_output_tokens
 
 
 def test_count_table_tokens_matches_manual_tiktoken_count():

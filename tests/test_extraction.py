@@ -1,4 +1,4 @@
-from ingestion.extraction import _is_blank, _normalize_table, _table_to_markdown, scan_pdf
+from ingestion.extraction.pdf import _is_blank, _normalize_table, _table_to_markdown, scan_pdf
 
 
 def test_normalize_table_strips_whitespace_and_replaces_none():

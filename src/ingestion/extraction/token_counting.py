@@ -1,7 +1,7 @@
 import tiktoken
 
-from ingestion.config.llm_config import LLMConfig
-from ingestion.models import TableGrid
+from common.config.llm_config import LLMConfig
+from common.models import TableGrid
 
 # Flagged default: no specific OpenAI model is pinned yet (Phase 2 decision).
 # o200k_base is the current-generation encoding; swap once Phase 2 picks a model.

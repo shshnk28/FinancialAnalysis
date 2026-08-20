@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from ingestion.interfaces.vector_store import VectorRecord, VectorStore
+from common.interfaces.vector_store import VectorRecord, VectorStore
 
 # §3e frozen decisions
 COLLECTION_NAME = "annual_reports"     # single collection, payload-filtered

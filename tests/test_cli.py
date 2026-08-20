@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from ingestion.cli import main
+from ingestion.extraction.cli import main
 
 _IDENTITY = ["--company", "Eternal Ltd", "--period", "FY2026"]
 

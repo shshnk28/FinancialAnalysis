@@ -1,6 +1,6 @@
 import pytest
 
-from ingestion.config.embedder_profile import ACTIVE_PROFILE, MPNET_PROFILE, EmbedderProfile
+from common.config.embedder_profile import ACTIVE_PROFILE, MPNET_PROFILE, EmbedderProfile
 
 
 def test_mpnet_profile_matches_frozen_spec():

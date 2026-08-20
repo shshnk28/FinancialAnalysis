@@ -2,7 +2,7 @@ import dataclasses
 
 import pytest
 
-from ingestion.config.llm_config import DEFAULT_LLM_CONFIG, LLMConfig
+from common.config.llm_config import DEFAULT_LLM_CONFIG, LLMConfig
 
 
 def test_default_llm_config_matches_frozen_spec():

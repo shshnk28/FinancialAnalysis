@@ -1,8 +1,8 @@
 import json
 from dataclasses import asdict
 
-from ingestion.manifest import build_manifest, load_manifest
-from ingestion.models import Chunk, SkippedVisual, TableGrid
+from common.manifest import build_manifest, load_manifest
+from common.models import Chunk, SkippedVisual, TableGrid
 
 
 def _sample_manifest():

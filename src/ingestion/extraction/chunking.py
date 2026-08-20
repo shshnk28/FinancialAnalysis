@@ -1,8 +1,8 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from ingestion.config.embedder_profile import EmbedderProfile
-from ingestion.extraction import PageExtraction
-from ingestion.models import Chunk
+from common.config.embedder_profile import EmbedderProfile
+from ingestion.extraction.pdf import PageExtraction
+from common.models import Chunk
 
 
 def chunk_prose(pages: list[PageExtraction], profile: EmbedderProfile, report_id: str) -> list[Chunk]:

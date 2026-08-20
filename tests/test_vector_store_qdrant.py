@@ -1,14 +1,14 @@
 import pytest
 
-from ingestion.interfaces.vector_store import VectorRecord
-from ingestion.vector_store_qdrant import COLLECTION_NAME, point_id_for
+from common.interfaces.vector_store import VectorRecord
+from ingestion.indexing.vector_store_qdrant import COLLECTION_NAME, point_id_for
 
 
 @pytest.fixture
 def store():
     from qdrant_client import QdrantClient
 
-    from ingestion.vector_store_qdrant import QdrantVectorStore
+    from ingestion.indexing.vector_store_qdrant import QdrantVectorStore
 
     return QdrantVectorStore(client=QdrantClient(location=":memory:"))
 

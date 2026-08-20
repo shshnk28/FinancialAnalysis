@@ -9,8 +9,16 @@ It defines a **two-phase** ingestion pipeline and the frozen decisions behind it
 
 Ingestion for a RAG-based investment-analysis tool. Input: company annual-report
 PDFs. Output: embeddings indexed in a vector DB, plus the original content as
-retrievable metadata. Retrieval, dossier assembly, and ratio-fetching from
-structured APIs are **out of scope** for this repo.
+retrievable metadata.
+
+**Scope (expanded — see §8).** Originally this repo was ingestion only. It is now
+being grown into a **live service**: a REST API over the pipeline, then retrieval
+(vector search + LLM answering), then a UI, then a hosted demo. So **serving the
+pipeline over HTTP is in scope**, and **retrieval is in scope from the search step
+(§8 Step 3) onward** — it was previously out of scope. Dossier assembly and
+ratio-fetching from structured APIs remain **out of scope**. The **CLI stays the
+reference path** and the **two-phase consent gate (§1/§1a) is unchanged** — the API
+is transport over the same seam, not a new pipeline.
 
 Language: **Python**.
 
@@ -30,10 +38,10 @@ The pipeline runs in two phases separated by a **cost-consent gate**.
   vector-graphic regions. No table content is embedded or indexed while this
   hold is in effect.
 
-**Phase 1 is complete. We are now implementing PHASE 2** against the frozen
-contract (§5) and decisions (§3, §1a). The phase boundary still holds: Phase 2
-runs ONLY behind the consent gate (§1a), and every piece of code must respect
-which phase it belongs to.
+**Phase 1 and Phase 2 are both built.** We are now building the **service layer**
+(§8) — a REST API over the same two phases, then search, UI, and hosting. The phase
+boundary still holds regardless of transport: Phase 2 runs ONLY behind the consent
+gate (§1a), and every piece of code must respect which phase it belongs to.
 
 **Self-check test:** which phase does this code belong to? Extraction, chunking,
 token-counting, and manifest assembly are **Phase 1** (free, local, no embedding).
@@ -52,7 +60,7 @@ The cost-consent gate is realized as **two separate CLI commands**, with the
    printing that path alongside the cost summary. The manifest is self-contained —
    it holds every chunk's text — so nothing else is needed downstream.
 2. **The user reviews** the printed cost summary.
-3. **`ingest-phase2 <manifest.json>`** (implemented in `cli_phase2.py`) takes the
+3. **`ingest-phase2 <manifest.json>`** (implemented in `ingestion/indexing/cli.py`) takes the
    manifest path as an **explicit argument**, **re-prints the cost summary** from it,
    and **requires interactive confirmation** (`[y/N]`, default No) before doing any
    embed/index work. A **`--yes`** flag bypasses the prompt for automation/CI;
@@ -93,183 +101,36 @@ Rules:
 
 ---
 
-## 3. FROZEN CONFIG
+## 3. FROZEN CONFIG — lives with the package that owns it
 
-### 3a. EmbedderProfile (starting values)
+To keep this file lean (§9), each frozen-config block now lives in the package
+CLAUDE.md next to its code. The **§ anchors are stable** — cross-references
+elsewhere in this file still resolve here:
 
-The embedder, its tokenizer, and chunk sizing are ONE bound unit. Swapping the
-embedder must swap the tokenizer and re-tune the chunker together — otherwise the
-chunker measures with the wrong ruler. Encode this as a single `EmbedderProfile`
-object that BOTH the chunker and the embed-call read from.
+- **§3a EmbedderProfile** — embedder/tokenizer/chunk-sizing as one bound unit
+  (mpnet, 512 max input, chunk 450, overlap 0.12). → **`src/common/CLAUDE.md`**
+- **§3b Chunker** — `RecursiveCharacterTextSplitter.from_huggingface_tokenizer`
+  fed the active profile's tokenizer. → **`src/ingestion/extraction/CLAUDE.md`**
+- **§3c LLM (table summarizer, ON HOLD)** — OpenAI behind `LLMClient.summarize`;
+  `max_output_tokens = 150`; not invoked while on hold. → **`src/common/CLAUDE.md`**
+- **§3d Credentials** — `OPENAI_API_KEY` via `python-dotenv`; never committed.
+  → **`src/common/CLAUDE.md`**
+- **§3e Vector DB** — Qdrant embedded, dense-only, single `annual_reports`
+  collection, `uuid5` point IDs, `(company, period)` collision guard, named vectors.
+  → **`src/ingestion/indexing/CLAUDE.md`**
+- **§3f Embedding execution** — sentence-transformers, local CPU, normalize,
+  batch 32. → **`src/ingestion/indexing/CLAUDE.md`**
 
-```
-EmbedderProfile:
-    name              = "all-mpnet-base-v2"
-    model_id          = "sentence-transformers/all-mpnet-base-v2"
-    tokenizer         = HF AutoTokenizer for model_id   # the chunker's ruler
-    max_input_tokens  = 512        # embedder's INPUT limit (hard truncation ceiling)
-    chunk_size        = 450        # tokens; headroom below max_input_tokens
-    overlap_ratio     = 0.12       # overlap = round(chunk_size * overlap_ratio) -> ~54 tokens
-```
-
-Rules:
-- `chunk_size` is in TOKENS, measured with this profile's `tokenizer`.
-- `chunk_size` MUST stay below `max_input_tokens` (headroom for special tokens),
-  or chunks get silently truncated by the embedder — forbidden (§2).
-- Overlap is derived: `overlap_tokens = round(chunk_size * overlap_ratio)`.
-  Keep `overlap_ratio` in the range 0.10–0.15. Never >= 0.5 (causes pathological
-  re-chunking).
-- This is the FIRST swappable component. Later, other profiles (MiniLM, bge, gte)
-  will be added and compared via recall@k. Build the abstraction now; add profiles
-  later.
-
-### 3b. Chunker
-
-- Use `RecursiveCharacterTextSplitter.from_huggingface_tokenizer()` fed the
-  active `EmbedderProfile.tokenizer`. This measures chunk length in the SAME
-  tokens the embedder will see.
-- Recursive separator behavior (paragraph -> line -> sentence -> word) and
-  overlap handling are the library's — do not hand-roll splitting.
-- Chunk size and overlap come from the active `EmbedderProfile` (§3a), never
-  hardcoded elsewhere.
-
-### 3c. LLM (Phase 2 — interface only in Phase 1; **currently on hold**)
-
-**STATUS: on hold.** Phase 2 does not call the LLM to summarize tables right
-now — tables are logged-and-skipped instead (§2), same disposition as images
-and dense vector-graphic regions. This is a reversible policy decision, not a
-scope removal: the interface, config, and Phase 1 token-counting/cost-estimate
-machinery described below stay in the codebase unchanged and are simply not
-invoked for table summarization at present. Phase 1's per-table token count and
-cost estimate are therefore informational only while the hold is in effect —
-no real spend occurs against them. See §6 for re-enabling this.
-
-- Provider: **OpenAI** (decided, if/when re-enabled). Tokenizer for cost estimation: **tiktoken**.
-- Expose a provider-agnostic interface:
-  ```
-  LLMClient.summarize(table_markdown: str) -> str
-  ```
-  OpenAI is the implementation behind it. Keep the interface clean so an
-  Anthropic implementation could be added without touching callers.
-- `max_output_tokens = 150` — the hard cap on each table summary's OUTPUT.
-  This is DISTINCT from `EmbedderProfile.max_input_tokens` (512). Different model,
-  different direction, different purpose. Do not conflate.
-- Prompt also instructs "at most 5 short lines" for quality; `max_output_tokens`
-  is the enforceable cost ceiling.
-- **Phase 1 does NOT call the LLM.** Phase 1 only imports the tiktoken tokenizer
-  to COUNT tokens for the estimate. The `LLMClient` implementation is Phase 2.
-
-### 3d. Credentials
-
-- Loaded from environment variables (`OPENAI_API_KEY`), via `python-dotenv`.
-- Never hardcoded. Never committed. `.env` is gitignored.
-
-### 3e. Vector DB (Phase 2 — DECIDED: Qdrant, embedded/in-process)
-
-- **Decision (frozen):** **Qdrant**, run **embedded / in-process** via
-  `QdrantClient(path=...)` — on-disk local persistence, **no server, no Docker**.
-  Rationale: local-first fit (nothing to operate), and an **identical client API
-  across embedded → local server → Qdrant Cloud**, so scaling up is a one-line
-  constructor change, never a rewrite — the §2 "build the abstraction now, swap
-  later" principle.
-- **Retrieval mode (frozen for now):** **DENSE ONLY.** Sparse vectors / hybrid
-  (dense+sparse) fusion is a **deferred improvement** (§6), not built day one.
-- **Collection config** (derived from §3a, not a new decision): **768-dim** vectors
-  (all-mpnet-base-v2), **cosine** distance.
-- **Collection layout (DECIDED):** a **single collection** (default name
-  `annual_reports`) holds every company's vectors; retrieval scopes by company/period
-  via **payload filters**, not separate collections. Simplest, enables cross-company
-  comparison, and scales fine at our size. (Under embedded exact-search a per-company
-  collection would shrink each query's search space, but a `company` payload filter
-  largely neutralizes that.)
-- **Point ID scheme (DECIDED):** Qdrant IDs must be uint64 or UUID, so the string
-  `chunk_id` (`report_id:page:chunk_index`) cannot be the ID directly. Use a
-  **deterministic `uuid5(namespace, chunk_id)`** as the point ID — same chunk always
-  maps to the same point, giving idempotent upserts. The human-readable `chunk_id`
-  rides in the payload for traceability.
-- **Payload schema (DECIDED):** each point carries `chunk_id`, `text` (the chunk
-  content, so retrieval returns text directly), `page`, `section`, plus the
-  denormalized document identity `report_id`, `document_name`, `company`, `period`.
-  **Payload indexes** are created on **`company`, `period`, `report_id`** (the filter
-  keys).
-- **Re-ingestion & `(company, period)` uniqueness guard (DECIDED):** before indexing,
-  Phase 2 checks Qdrant for existing points at this `(company, period)` and branches:
-  - **None exist** → proceed (fresh index).
-  - **Exist with the same `report_id`** → identical content; idempotent refresh (the
-    deterministic UUIDv5 IDs overwrite in place); proceed quietly.
-  - **Exist with a _different_ `report_id`** → **collision**: a different document is
-    already indexed for this company+period. The system CANNOT distinguish a legitimate
-    corrected-report re-ingest from a mistaken wrong-file ingest — both look like "a new
-    `report_id` landing on an existing `(company, period)`" — so it must NOT act silently.
-    **Refuse by default:** interactively, show existing (`document_name`, `report_id`) vs
-    incoming and require an explicit `[y/N]` confirm (default **No**); non-interactively
-    (`--yes`), refuse unless **`--replace`** is ALSO passed. Only on explicit approval does
-    it **replace** — delete existing points keyed on `(company, period)` (NOT `report_id`,
-    which changes with content), then insert the new version. This upholds §2 (no silent
-    data loss): a mistaken re-index aborts with the prior document intact.
-  - **Caveat:** the guard is only as reliable as `(company, period)` strings being
-    consistent — free-text `period` spellings (`FY2026` vs `FY25-26`) would evade it.
-    Hardening via a canonical key / `period` normalization is deferred (§6).
-- **Forward-compat for hybrid:** create the collection with **named vectors** (the
-  dense vector named, e.g. `"dense"`) so a sparse vector can be added later without a
-  destructive migration. Do NOT add sparse now.
-- Abstract behind an interface (unchanged):
-  ```
-  VectorStore.index(records: list[VectorRecord]) -> None
-  ```
-  where a `VectorRecord` carries the vector + original content + metadata. The
-  concrete `QdrantVectorStore(VectorStore)` is implemented in
-  `src/ingestion/vector_store_qdrant.py` — `VectorRecord` maps to a Qdrant point
-  `(uuid5 id, {"dense": vector}, payload)`.
-
-### 3f. Embedding execution (Phase 2 — DECIDED: sentence-transformers, local, CPU)
-
-- **Decision (frozen):** run the `EmbedderProfile.model_id` model via the
-  **`sentence-transformers`** library, **locally, on CPU**. This is the canonical,
-  reference-correct way to run all-mpnet-base-v2. It adds **`torch`** as a Phase 2
-  dependency — Phase 1 deliberately avoided torch (fast tokenizer only); this is
-  the point where it legitimately enters.
-- **Concrete implementation:** `SentenceTransformerEmbedder(Embedder)` in
-  `src/ingestion/embedding.py` loads `profile.model_id` and implements
-  `embed(texts) -> list[list[float]]` (lazy CPU model load). All model/sizing config
-  comes from the active `EmbedderProfile` (§3a) — never hardcoded here.
-- **Encode settings (frozen):**
-  - `normalize_embeddings=True` — unit-length vectors. Redundant under the frozen
-    cosine distance (§3e) but harmless, and leaves the door open to switch to
-    faster dot-product later without re-embedding.
-  - `batch_size = 32` — number of chunks embedded per forward pass (NOT tokens,
-    NOT vector dims); sensible CPU default, tunable and not load-bearing — it has
-    no effect on the resulting vectors, only throughput/memory.
-  - **No query/passage prefixes** — mpnet does not use them (unlike e5/bge);
-    embed chunk text as-is.
-- **Input:** `prose_chunks[*].text` only. Tables are NOT embedded while the LLM
-  table-summarization hold (§3c) is in effect — they are logged-and-skipped.
-- **Free but still Phase 2:** local CPU embedding incurs no API spend, but §1
-  places embedding in Phase 2 regardless — it runs only after the cost-consent
-  gate, never in the Phase 1 scan.
-- **Model asset:** all-mpnet-base-v2 (~420MB) downloads once from the HF Hub to the
-  local cache (the same one-time free download as the tokenizer), then runs offline.
+The two numbers people confuse (`max_input_tokens` 512 vs `max_output_tokens` 150)
+are in §7.
 
 ---
 
-## 4. PHASE 1 — build order (verify each step before the next)
+## 4. PHASE 1 — build order
 
-Build incrementally. After each step, print output and stop so it can be run and
-verified before continuing.
-
-1. **Extraction** — pdfplumber over every page:
-   - text mode -> prose
-   - table mode -> tables as markdown grids
-   - detect image objects (`page.images`) and dense vector-graphic regions
-     (`page.curves`) for the log-and-skip branch
-   - print a per-page report of what was found
-2. **Chunking** — split prose via §3b using the active `EmbedderProfile`.
-   Print chunk count and a sample chunk with its token length.
-3. **Token counting** — for each table, compute EXACT input tokens
-   (prompt + table markdown) via tiktoken. Output is bounded by
-   `max_output_tokens` (150), not counted.
-4. **Manifest + cost report** — assemble the §5 manifest dataclass and print the
-   consent summary (see the Phase 1 sample doc for the exact shape).
+The step-by-step build order (extraction → chunking → token counting → manifest +
+cost report) and the extraction rules (blank-table reclassification, image/curve
+log-and-skip) live in **`src/ingestion/extraction/CLAUDE.md`**.
 
 ---
 
@@ -343,3 +204,82 @@ Different models, different directions. Never merge them.
 
 Note: LLM table-summarization is currently on hold (§3c), so `max_output_tokens`
 remains defined in code but isn't presently enforced against real spend.
+
+---
+
+## 8. SERVICE / API LAYER (in progress)
+
+The pipeline is being grown from two CLI commands into a **live, demoable service**.
+This is transport over the existing seam (§5) and gate (§1a) — **not** a new
+pipeline. We build one step at a time:
+
+| Step | Deliverable | Status |
+|---|---|---|
+| **1** | Phase-1 scan API (path + company + period → job → manifest + cost summary) | **built** |
+| 2 | Phase-2 indexing API (manifest filename → job → "registered"); Qdrant → server mode | planned |
+| 3 | Search API (query + company + period → vector search → LLM answer over chunks) | planned |
+| 4 | UI over indexing + search | planned |
+| 5 | Host on portfolio site | planned |
+
+**Frozen decisions:**
+- **Framework:** FastAPI + uvicorn. Entry point: `ingest-api` (`api.app:run`).
+- **Async, both phases:** a scan (~108s) and an embed (~77s) can't block an HTTP
+  response, so `POST /phase1` (and later the phase-2 endpoint) returns a **job id
+  immediately** and the client polls **`GET /jobs/{id}`** for status + result. The
+  job runner is an in-process `JobStore` on a thread pool (§ `api/jobs.py`) —
+  deliberately swappable for an out-of-process queue when Step 2's heavier torch
+  embedding arrives.
+- **Input:** **server-side file path** for now (`Phase1Request.file_path`). Multipart
+  upload is deferred to the hosting step (Step 5), when anonymous visitors have no
+  server path.
+- **Qdrant server mode** is the target once API + indexing worker + search run as
+  separate processes (one-line `QdrantClient(url=...)`, §3e). Wired in Step 2/3 —
+  **Phase 1 never touches Qdrant**, so Step 1 doesn't need it.
+
+**Phase boundary still holds.** Phase 1 over HTTP is **free/local** — no embedding,
+Qdrant, or LLM. The consent gate (§1a) still governs Phase 2, now realized as the
+**deliberate second API call** (Step 2), the transport equivalent of the second CLI
+invocation.
+
+**Shared code path.** Both the CLI and the API call `run_phase1_scan(...)` in
+`src/ingestion/extraction/service.py` (extraction → chunk → count → build_manifest → persist).
+The CLI adds only presentation (`print_consent_summary` + next-step hints); the API
+returns the same numbers as JSON. No duplicated orchestration.
+
+**Endpoints (Step 1):** `POST /phase1` → `202 {job_id, status:"registered"}`;
+`GET /jobs/{job_id}` → status, and on `done` a `result` of
+`{report_id, manifest_file, cost_summary}` (`manifest_file` = `<report_id>.json`,
+the artifact Step 2 consumes); `GET /healthz`; auto OpenAPI docs at `/docs`.
+Endpoint/job details live in **`src/api/CLAUDE.md`**.
+
+---
+
+## 9. REPO STRUCTURE — where things live
+
+This root file holds the **cross-cutting invariants** (phase boundary §1/§1a,
+principles §2, the seam §5, open decisions §6, the roadmap §8). Package-specific
+detail lives in a `CLAUDE.md` next to the code — Claude Code loads it automatically
+when you work in that subtree. **Keep each invariant in exactly one place** (this
+root); package files *reference* §-anchors, never restate them, or the copies drift.
+
+```
+src/
+  common/           # shared contract + config + interfaces — imports nothing above it
+    models.py         §5 seam dataclasses (IngestionManifest, Chunk, …)
+    manifest.py       build/estimate/print/load over the manifest
+    config/           §3a EmbedderProfile · §3c LLMConfig · pricing
+    interfaces/       Embedder · LLMClient · VectorStore ABCs
+    CLAUDE.md         → §3a, §3c, §3d
+  ingestion/        # the write path (PDF → indexed vectors)
+    CLAUDE.md         → umbrella: the two phases + the seam
+    extraction/       Phase 1 (Scan, free/local): pdf, chunking, token_counting,
+                      report_id, service (run_phase1_scan), cli   → §3b, §4
+    indexing/         Phase 2 (Process, gated): embedding, vector_store_qdrant, cli
+                      → §3e, §3f
+  search/           # the read path — Step 3 skeleton (planned)   → §8 Step 3
+  api/              # FastAPI transport over the pipeline: app, jobs   → §8
+CLAUDE.md           # this file — invariants, contract, roadmap
+```
+
+**Console scripts:** `ingest-phase1` → `ingestion.extraction.cli:main`;
+`ingest-phase2` → `ingestion.indexing.cli:main`; `ingest-api` → `api.app:run`.

@@ -1,6 +1,6 @@
-from ingestion.config.pricing import CHEAP_TIER, EXPENSIVE_TIER
-from ingestion.manifest import build_manifest, estimate_cost
-from ingestion.models import Chunk, SkippedVisual, TableGrid
+from common.config.pricing import CHEAP_TIER, EXPENSIVE_TIER
+from common.manifest import build_manifest, estimate_cost
+from common.models import Chunk, SkippedVisual, TableGrid
 
 
 def test_estimate_cost_arithmetic():

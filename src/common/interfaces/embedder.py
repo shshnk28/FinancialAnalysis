@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ingestion.config.embedder_profile import EmbedderProfile
+from common.config.embedder_profile import EmbedderProfile
 
 
 class Embedder(ABC):

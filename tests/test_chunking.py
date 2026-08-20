@@ -1,6 +1,6 @@
-from ingestion.chunking import chunk_prose
-from ingestion.config.embedder_profile import ACTIVE_PROFILE
-from ingestion.extraction import PageExtraction
+from ingestion.extraction.chunking import chunk_prose
+from common.config.embedder_profile import ACTIVE_PROFILE
+from ingestion.extraction.pdf import PageExtraction
 
 
 def test_chunk_prose_produces_chunk_id_scheme_report_id_page_index():

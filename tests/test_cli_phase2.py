@@ -1,9 +1,9 @@
 import pytest
 
-from ingestion.cli_phase2 import run_phase2
-from ingestion.manifest import build_manifest
-from ingestion.models import Chunk
-from ingestion.vector_store_qdrant import COLLECTION_NAME, QdrantVectorStore
+from ingestion.indexing.cli import run_phase2
+from common.manifest import build_manifest
+from common.models import Chunk
+from ingestion.indexing.vector_store_qdrant import COLLECTION_NAME, QdrantVectorStore
 
 DIM = 8
 

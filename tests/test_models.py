@@ -1,4 +1,4 @@
-from ingestion.models import IngestionManifest
+from common.models import IngestionManifest
 
 
 def test_ingestion_manifest_default_lists_are_independent_instances():

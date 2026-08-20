@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pdfplumber
 
-from ingestion.models import SkippedVisual, TableGrid
+from common.models import SkippedVisual, TableGrid
 
 DENSE_CURVE_THRESHOLD = 20
 

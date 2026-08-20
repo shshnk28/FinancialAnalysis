@@ -3,10 +3,10 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from ingestion.interfaces.vector_store import VectorRecord
-from ingestion.manifest import load_manifest, print_consent_summary
-from ingestion.models import IngestionManifest
-from ingestion.vector_store_qdrant import COLLECTION_NAME, QdrantVectorStore
+from common.interfaces.vector_store import VectorRecord
+from common.manifest import load_manifest, print_consent_summary
+from common.models import IngestionManifest
+from ingestion.indexing.vector_store_qdrant import COLLECTION_NAME, QdrantVectorStore
 
 
 def _report_id_of(manifest: IngestionManifest) -> str:
@@ -120,7 +120,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    from ingestion.embedding import SentenceTransformerEmbedder
+    from ingestion.indexing.embedding import SentenceTransformerEmbedder
 
     manifest = load_manifest(args.manifest_path)
     store = QdrantVectorStore(path=args.qdrant_path)

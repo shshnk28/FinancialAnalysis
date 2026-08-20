@@ -1,10 +1,10 @@
 import sys
 
-from ingestion.cli import main as phase1_main
-from ingestion.cli_phase2 import run_phase2
-from ingestion.embedding import SentenceTransformerEmbedder
-from ingestion.manifest import load_manifest
-from ingestion.vector_store_qdrant import COLLECTION_NAME, QdrantVectorStore
+from ingestion.extraction.cli import main as phase1_main
+from ingestion.indexing.cli import run_phase2
+from ingestion.indexing.embedding import SentenceTransformerEmbedder
+from common.manifest import load_manifest
+from ingestion.indexing.vector_store_qdrant import COLLECTION_NAME, QdrantVectorStore
 
 
 def test_phase1_then_phase2_end_to_end(synthetic_pdf, tmp_path, monkeypatch):

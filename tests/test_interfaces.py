@@ -1,10 +1,10 @@
 import pytest
 
-from ingestion.config.embedder_profile import ACTIVE_PROFILE
-from ingestion.config.llm_config import DEFAULT_LLM_CONFIG
-from ingestion.interfaces.embedder import Embedder
-from ingestion.interfaces.llm_client import LLMClient
-from ingestion.interfaces.vector_store import VectorRecord, VectorStore
+from common.config.embedder_profile import ACTIVE_PROFILE
+from common.config.llm_config import DEFAULT_LLM_CONFIG
+from common.interfaces.embedder import Embedder
+from common.interfaces.llm_client import LLMClient
+from common.interfaces.vector_store import VectorRecord, VectorStore
 
 
 def test_embedder_cannot_be_instantiated_directly():

@@ -1,7 +1,7 @@
 from functools import cached_property
 
-from ingestion.config.embedder_profile import ACTIVE_PROFILE, EmbedderProfile
-from ingestion.interfaces.embedder import Embedder
+from common.config.embedder_profile import ACTIVE_PROFILE, EmbedderProfile
+from common.interfaces.embedder import Embedder
 
 # Chunks per forward pass (§3f) — throughput/memory only; no effect on the vectors.
 BATCH_SIZE = 32

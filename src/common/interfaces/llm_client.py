@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ingestion.config.llm_config import LLMConfig
+from common.config.llm_config import LLMConfig
 
 
 class LLMClient(ABC):

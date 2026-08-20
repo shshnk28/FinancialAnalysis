@@ -1,7 +1,7 @@
 import math
 
-from ingestion.embedding import SentenceTransformerEmbedder
-from ingestion.interfaces.embedder import Embedder
+from ingestion.indexing.embedding import SentenceTransformerEmbedder
+from common.interfaces.embedder import Embedder
 
 
 def test_embedder_is_an_embedder():

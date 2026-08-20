@@ -1,4 +1,4 @@
-from ingestion.report_id import compute_report_id
+from ingestion.extraction.report_id import compute_report_id
 
 
 def test_report_id_is_twelve_hex_chars(tmp_path):

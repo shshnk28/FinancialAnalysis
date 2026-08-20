@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from ingestion.config.pricing import CHEAP_TIER, EXPENSIVE_TIER
-from ingestion.models import Chunk, CostEstimate, IngestionManifest, SkippedVisual, TableGrid
+from common.config.pricing import CHEAP_TIER, EXPENSIVE_TIER
+from common.models import Chunk, CostEstimate, IngestionManifest, SkippedVisual, TableGrid
 
 
 def estimate_cost(table_tokens: list[int], est_output_tokens: int) -> CostEstimate:
